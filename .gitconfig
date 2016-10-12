@@ -1,0 +1,37 @@
+[color]
+    ui = auto
+    diff = auto
+    branch = auto
+    interactive = auto
+[user]
+    name = Meng Yang
+    email = meyang@redhat.com
+[alias]
+    st = status
+    ci = commit
+    br = branch
+    co = checkout
+    df = diff
+    lg = log -p
+[stgit]
+    pager = colordiff | less -FRX
+    smtpserver = 
+    sender = Meng Yang <meyang@redhat.com>
+    smtpuser = meyang@redhat.com
+[sendemail]
+       smtpserver = 
+    from = meyang@redhat.com
+#    chainreplyto = false
+[format]
+    to = meyang@redhat.com
+    subjectprefix = KVM-AUTOTEST][PATCH
+    #headers =
+    #suffix =
+    #numbered =
+    #cc =
+    #
+    signoff = true
+[core]
+	editor = vim
+[receive]
+    denyCurrentBranch = false
