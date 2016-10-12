@@ -1,0 +1,4 @@
+How to:
+1. Your host need have two nics, sine we don't have a switch support vepa.
+2. Make sure at least on nic on your host is alive and not belong to any bridge.
+3. Modify the configuration make nettype = macvtap
