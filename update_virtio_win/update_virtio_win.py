@@ -1,38 +1,25 @@
-__maintainer__ = 'meyang@redhat.com'
-__version__ = '1.0'
-
+# -*- coding:utf-8 -*-
 import os
-import sys
+import re
 import shutil
 import smtplib
 import logging.config
 import subprocess
-import ConfigParser
+try:
+    import ConfigParser
+except:
+    import configparser as ConfigParser
 from email.mime.text import MIMEText
 
-
-def mail_sent(to_list, subject, content, maintainer="meyang",
-              smtp="smtp.corp.redhat.com"):
-    """
-    send email
-    """
-    mail = MIMEText(content, _subtype='plain', _charset='utf-8')
-    mail['Subject'] = subject
-    mail['To'] = ";".join(to_list)
-    mail['From'] = maintainer
-
-    try:
-        server = smtplib.SMTP(smtp)
-        server.sendmail(maintainer, to_list, mail.as_string())
-        server.quit()
-    except Exception as e:
-        logger.info(e)
-    return
+__maintainer__ = 'meyang@redhat.com'
+__version__ = '1.0'
+__all__ = []
 
 
 class UpdateVirtioWin:
-
+    #Todo: The class needs to be rearranged so that some of the repeated code could be eliminated.
     virtio_win_name_list = []
+    released_virtio_win_name_list = []
 
     def __init__(self, tag, packagename, virtio_win_version, nfspath, workdir, nfsserver, decompressed_dir):
         self.tag = tag
@@ -54,7 +41,19 @@ class UpdateVirtioWin:
             virtio_win_name = self.get_latest_virtio_win_name()
             if virtio_win_name in version:
                 return True
+        return False
 
+    def check_released_virtio_win(self):
+        """
+        Check the released version
+        :return:
+        """
+        existed_virtio_win_released = os.listdir(self.nfspath)
+        logger.info('Existed released virtio_win_file and its linkname:\n {}'.format(existed_virtio_win_released))
+        for version in existed_virtio_win_released:
+            virtio_win_name = self.get_released_virtio_win_name()
+            if virtio_win_name in version:
+                return True
         return False
 
     def process_cmd(self, cmd):
@@ -84,6 +83,12 @@ class UpdateVirtioWin:
                 if '_' in i:
                     return i, j
 
+    def __get_released_virtio_win(self):
+        cmd = "brew latest-pkg {} {}".format(self.tag, self.packagename)
+        cmd += " | grep virtio | awk '{print $1}'"
+
+        return self.process_cmd(cmd), self.tag
+
     def get_latest_virtio_win_name(self):
         """
         Get the latest virtio_win_name
@@ -93,6 +98,11 @@ class UpdateVirtioWin:
         logger.info('The latest virtio_win_name is: {}'.format(virtio_win_name))
         return virtio_win_name
 
+    def get_released_virtio_win_name(self):
+        released_virtio_win_name = self.__get_released_virtio_win()[0]
+        logger.info('The released virtio_win_name is: {}'.format(released_virtio_win_name))
+        return released_virtio_win_name
+
     def get_latest_virtio_win_tag(self):
         """
         Get the latest virtio_win_tag
@@ -101,6 +111,11 @@ class UpdateVirtioWin:
         virtio_win_tag = self.__get_latest_virtio_win()[1]
         logger.info('The latest virtio_win_tag is: {}'.format(virtio_win_tag))
         return virtio_win_tag
+
+    def get_released_virtio_win_tag(self):
+        released_virtio_win_tag = self.__get_released_virtio_win()[1]
+        logger.info('The released virtio_win_tag is: {}'.format(released_virtio_win_tag))
+        return released_virtio_win_tag
 
     def download(self):
         """
@@ -118,12 +133,25 @@ class UpdateVirtioWin:
         # if not subp.returncode == 1:
         #     print('download error. {}'.format(data_err))
 
+    def download_released(self):
+        tagname_released = self.get_released_virtio_win_tag()
+        cmd = "cd {};brew download-build --arch=noarch --latestfrom={} {}"
+        cmd = cmd.format(self.workdir, tagname_released, self.packagename)
+        logger.info('Start to Download virtio_win rpm package: {}'.format(self.packagename))
+        self.process_cmd(cmd)
+
     def decompress_rpm_package(self):
         """
         Decompress the package and find the iso files needed.
         :return: None
         """
         package = "{}.noarch.rpm".format(self.get_latest_virtio_win_name())
+        cmd = "cd {};rpm2cpio {} | cpio -dimv".format(self.workdir, package)
+        logger.info('Start to decompress: {}'.format(package))
+        subprocess.check_call(cmd, shell=True)
+
+    def decompress_released_rpm_package(self):
+        package = "{}.noarch.rpm".format(self.get_released_virtio_win_name())
         cmd = "cd {};rpm2cpio {} | cpio -dimv".format(self.workdir, package)
         logger.info('Start to decompress: {}'.format(package))
         subprocess.check_call(cmd, shell=True)
@@ -154,6 +182,25 @@ class UpdateVirtioWin:
                 else:
                     shutil.move(i, '{}_x86.vfd'.format(virtio_win_name))
 
+    def __rename_released_file(self, pattern='virtio-win-'):
+        """
+        Rename the virio_win file name according to the one defined.
+        :param pattern:
+        :return:
+        """
+        virtio_win_name = self.get_released_virtio_win_name()
+        file_dir = self.__get_file_dir()
+        logger.info('Current directory: {}'.format(file_dir))
+        os.chdir(file_dir)
+        for i in os.listdir(file_dir):
+            if pattern in i:
+                if i.endswith('.iso'):
+                    shutil.move(i, '{}.iso'.format(virtio_win_name))
+                elif i.endswith('amd64.vfd'):
+                    shutil.move(i, '{}_amd64.vfd'.format(virtio_win_name))
+                else:
+                    shutil.move(i, '{}_x86.vfd'.format(virtio_win_name))
+
     def __get_virtio_win_name_list(self, pattern='virtio-win-'):
         """
         Get the virtio_win list after rename
@@ -161,6 +208,21 @@ class UpdateVirtioWin:
         :return: the virtio_win list after rename
         """
         self.__rename_file()
+        virtio_list = []
+        file_dir = self.__get_file_dir()
+        for filename in os.listdir(file_dir):
+            if pattern in filename:
+                virtio_list.append(os.path.join(file_dir, filename))
+
+        return virtio_list
+
+    def __get_released_virtio_win_name_list(self, pattern='virtio-win-'):
+        """
+        Get the virtio_win list after rename
+        :param pattern:
+        :return: the virtio_win list after rename
+        """
+        self.__rename_released_file()
         virtio_list = []
         file_dir = self.__get_file_dir()
         for filename in os.listdir(file_dir):
@@ -178,9 +240,21 @@ class UpdateVirtioWin:
         for filename in virtio_list:
             shutil.copy(filename, self.nfspath)
 
+    def copy_released_to_nfs(self):
+        """
+        Copy the needed iso/vfd files to our working nfs.
+        :return: None
+        """
+        virtio_list = self.__get_released_virtio_win_name_list()
+        for filename in virtio_list:
+            shutil.copy(filename, self.nfspath)
+
     def make_link(self):
         """
         Create the predefined soft link name:
+        if el9 comes out ,we could add the map in the dict and etc.
+        the name is got from ./staf-kvm-devel/internal_cfg/host-kernel/Host_RHEL/7.cfg
+        map:
         virtio-win.iso.el6 -> virtio-win-latest-signed-el6.iso ->
         virtio-win_x86.vfd.el6 -> virtio-win-latest-signed-el6.vfd.i386 ->
         virtio-win_amd64.vfd.el6 -> virtio-win-latest-signed-el6.vfd.amd64 ->
@@ -230,6 +304,25 @@ class UpdateVirtioWin:
         for image in image_type:
             __create(image)
 
+    def make_link_released(self):
+        image_type = ['amd64.vfd', 'x86.vfd', 'iso']
+
+        def __create(imagetype):
+            virtio_list = self.__get_released_virtio_win_name_list()
+            prefix = 'virtio-win'
+            for virtio_win_name in virtio_list:
+                os.chdir(self.nfspath)
+                if virtio_win_name.endswith(imagetype):
+                    pattern = '({}_\d)'.format(self.virtio_win_version)
+                    linkname = re.search(pattern, virtio_win_name)
+                    if linkname is not None:
+                        link = linkname.group(1)
+                        link = prefix + '_' + imagetype + '.' + link
+                        self.released_virtio_win_name_list.append(os.path.basename(virtio_win_name))
+                        os.symlink(os.path.basename(virtio_win_name), link)
+
+        for image in image_type:
+            __create(image)
     def __make_dir(self):
         """
         Create directory
@@ -295,16 +388,45 @@ class UpdateVirtioWin:
         else:
             logger.warn('{} exists, will not recreate it.'.format(self.get_latest_virtio_win_name()))
 
+    def update_released_virtio_win(self):
+        logger.info('Start to update released virtio_win, Please wait for a while.')
+        self.mount_dir()
+        if not self.check_released_virtio_win():
+            self.download_released()
+            self.decompress_released_rpm_package()
+            self.copy_released_to_nfs()
+            self.make_link_released()
+            self.umount_dir()
+        else:
+            logger.warn('{} exists, will not recreate it.'.format(self.get_released_virtio_win_name()))
+
     def __str__(self):
         pass
+
+
+def mail_sent(to_list, subject, content, maintainer="meyang",
+              smtp="smtp.corp.redhat.com"):
+    """
+    send email
+    """
+    mail = MIMEText(content, _subtype='plain', _charset='utf-8')
+    mail['Subject'] = subject
+    mail['To'] = ";".join(to_list)
+    mail['From'] = maintainer
+
+    try:
+        server = smtplib.SMTP(smtp)
+        server.sendmail(maintainer, to_list, mail.as_string())
+        server.quit()
+    except Exception as e:
+        logger.info(e)
+    return
 
 
 def main():
     """
     working function of all.
     """
-    # froce_create = False
-
     logger.debug('Start init Env:')
     cfg = ConfigParser.ConfigParser()
     cfg.read(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'virtio_win.cfg'))
@@ -313,6 +435,7 @@ def main():
     nfspath = cfg.get(base, 'nfspath')
     packagename = cfg.get(base, 'package_name')
     rhel = cfg.get(base, 'os_list').split()
+    released_rhel = cfg.get(base, 'released_os_list').split()
     workdir = cfg.get(base, 'workdir')
     decompressed_dir = cfg.get(base, 'decompressed_dir')
     maintainer = cfg.get(base, 'maintainer')
@@ -324,7 +447,12 @@ def main():
 
     virtio_win_version = ""
     name_list = []
+    name_list_released = []
 
+    # update the latest version
+    # rhel7.4 will use the virito_win version belonging to rhel7.3
+    # this is because virtio_win package comes out slowly
+    # so always keep the latest one
     for osname in rhel:
         logger.info("rhel version is {}".format(osname))
         tag = cfg.get(osname, 'tagname').split()
@@ -342,8 +470,41 @@ def main():
         content = content.replace('NFS_SERVER', update_virtio_win_package.nfsserver)
         name_list = update_virtio_win_package.virtio_win_name_list
 
-    if name_list:
-        content = content.replace('VIRTIO_WIN', ' '.join(name_list))
+    logger.debug("*" * 100)
+
+    # this one update the version which has been released
+    # for example:
+    # before virtio_win of rhel7.4 comes out ,we will use virtio_win of rhel7.3
+    # but if virtio_win of rhel7.4 comes out ,then we will add the virtio_win of rhel7.3
+    # to the released_list in cfg file. and then update the os_list to rhel7.4
+    for releasedosname in released_rhel:
+        logger.info("released rhel version is {}".format(releasedosname))
+        tag_released =cfg.get(releasedosname, 'tagname_released')
+        logger.error('tag_released {}'.format(tag_released))
+        logger.info("released virtio_win tag is {}".format(tag_released))
+        if releasedosname.find('RHEL7') != -1:
+            virtio_win_version = 'el7'
+            logger.info('virtio_win_version is {}'.format(virtio_win_version))
+        if releasedosname.find('RHEL6') != -1:
+            virtio_win_version = 'el6'
+            logger.info('virtio_win_version is {}'.format(virtio_win_version))
+
+        update_released_virtio_win_package = UpdateVirtioWin(
+            tag_released, packagename, virtio_win_version, nfspath, workdir, nfsserver, decompressed_dir)
+        update_released_virtio_win_package.update_released_virtio_win()
+        content = content.replace('NFS_SERVER', update_released_virtio_win_package.nfsserver)
+        name_list_released = update_released_virtio_win_package.released_virtio_win_name_list
+
+    # if name_list:
+    #     content = content.replace('VIRTIO_WIN', ' '.join(name_list))
+    #     mail_sent(notification_list, subject, content, sender)
+    # if name_list_released:
+    #     content = content.replace('VIRTIO_WIN', ' '.join(name_list_released))
+    #     mail_sent(notification_list, subject, content, sender)
+
+    virtio_list = name_list.extend(name_list_released)
+    if virtio_list:
+        content = content.replace('VIRTIO_WIN', ' '.join(virtio_list))
         mail_sent(notification_list, subject, content, sender)
 
 
