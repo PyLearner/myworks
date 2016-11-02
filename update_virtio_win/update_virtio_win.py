@@ -502,7 +502,9 @@ def main():
     #     content = content.replace('VIRTIO_WIN', ' '.join(name_list_released))
     #     mail_sent(notification_list, subject, content, sender)
 
-    virtio_list = name_list.extend(name_list_released)
+    virtio_list = []
+    virtio_list.extend(name_list)
+    virtio_list.extend(name_list_released)
     if virtio_list:
         content = content.replace('VIRTIO_WIN', ' '.join(virtio_list))
         mail_sent(notification_list, subject, content, sender)
