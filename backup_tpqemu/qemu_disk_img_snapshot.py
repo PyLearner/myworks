@@ -2,14 +2,12 @@ import logging
 import os
 import re
 
-from autotest.client.shared import error
 from autotest.client.shared import data_dir
-
-from virttest import storage
-from virttest import env_process
-
+from autotest.client.shared import error
 from avocado.core import exceptions
 from avocado.utils import process
+from virttest import env_process
+from virttest import storage
 
 
 def run(test, params, env):
@@ -47,24 +45,24 @@ def run(test, params, env):
             raise exceptions.TestError(
                 "Failed to install using {}".format(yum_cmd))
         logging.info("Create ssh key & copy it using ssh-copy-id")
-        process.system(params.get("create_ssh_key_cmd"))
-        process.system(params.get("copy_pub_key_cmd"))
+        process.system(params.get("create_ssh_key_cmd"), shell=True)
+        process.system(params.get("copy_pub_key_cmd"), shell=True)
         logging.info("Start to create snapshot based on {}".format(base_file))
-        process.system(params.get("create_snapshot_cmd"))
+        process.system(params.get("create_snapshot_cmd"), shell=True)
         params["images"] = params.get("snapshot_image")
         test_vm()
 
     @error.context_aware
     def create_https_test():
         logging.info("Start httpd service")
-        process.system(params.get("http_conf_cmd"))
-        process.system(params.get("httpd_start_cmd"))
+        process.system(params.get("http_conf_cmd"), shell=True)
+        process.system(params.get("httpd_start_cmd"), shell=True)
         out = process.system_output(params.get("httpd_status_cmd"))
         if not re.search(params.get("httpd_status_re"), out):
             exceptions.TestError(
                 "Http server fails to start, because of {}".format(out))
         logging.info("Start to create snapshot based on {}".format(base_file))
-        process.system(params.get("create_snapshot_cmd"))
+        process.system(params.get("create_snapshot_cmd"), shell=True)
         params["images"] = params.get("snapshot_image")
         test_vm()
 
