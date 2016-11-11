@@ -30,6 +30,7 @@ def run(test, params, env):
         env_process.preprocess_vm(test, params, env, vm_name)
         vm = env.get_vm(vm_name)
         vm.verify_alive()
+        vm.destroy()
 
     test_vm()
     yum_cmd = params.get("yum_cmd")
@@ -40,13 +41,18 @@ def run(test, params, env):
     @error.context_aware
     def create_ssh_test():
         logging.info("Prepare ssh login environment.")
+        copy_pub_key_cmd = params.get("copy_pub_key_cmd")
+        copy_pub_key_cmd = copy_pub_key_cmd.replace(
+            "host_password", params.get("host_password"))
         process.system(yum_cmd)
         if not os.path.exists("/usr/bin/sshpass"):
             raise exceptions.TestError(
                 "Failed to install using {}".format(yum_cmd))
         logging.info("Create ssh key & copy it using ssh-copy-id")
         process.system(params.get("create_ssh_key_cmd"), shell=True)
-        process.system(params.get("copy_pub_key_cmd"), shell=True)
+        process.system(copy_pub_key_cmd, shell=True)
+        # process.system(params.get("ssh_agent_cmd"), shell=True)
+        # process.system(params.get("ssh_add_cmd"), shell=True)
         logging.info("Start to create snapshot based on {}".format(base_file))
         process.system(params.get("create_snapshot_cmd"), shell=True)
         params["images"] = params.get("snapshot_image")
