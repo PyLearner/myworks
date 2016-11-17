@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import shutil
 
@@ -26,6 +25,10 @@ def run(test, params, env):
     :param env: Dictionary with test environment.
     """
 
+    def clean_key():
+        process.system("rm -rf {}/id*".format(
+            params.get("ssh_key_dir")), shell=True)
+
     @error.context_aware
     def create_ssh_test():
 
@@ -34,6 +37,7 @@ def run(test, params, env):
         :return: None
         """
         error.context("STEP 1: Prepare ssh login environment.")
+        clean_key()
         copy_pub_key_cmd = params.get("copy_pub_key_cmd")
         logging.info("Create ssh key & copy it using ssh-copy-id")
         process.system(params.get("create_ssh_key_cmd"), shell=True)
@@ -72,7 +76,8 @@ def run(test, params, env):
         {"image_name_%s" % base_image: params["image_name"],
          "image_format_%s" % base_image: params["image_format"]})
     t_file = params["guest_temp_file_%s" % base_image]
-    snapshot_test = qemu_disk_img_info.InfoTest(test, params, env, base_image)
+    snapshot_test = qemu_disk_img_info.InfoTest(
+        test, params, env, base_image)
     logging.info("STEP 2: Save file md5sum before create snapshot.")
     snapshot_test.start_vm(params)
     md5_before_snapshot = snapshot_test.save_file(t_file)
@@ -121,6 +126,6 @@ def run(test, params, env):
     if params.get("external_snapshot_driver") == "ssh":
         shutil.copy(user_profile_backup, user_profile)
         process.kill_process_by_pattern("ssh-agent")
-        process.system("rm -rf {}/id*".format(params.get("ssh_key_dir")), shell=True)
+        clean_key()
 
     snapshot_test.clean()
