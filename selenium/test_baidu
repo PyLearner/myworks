@@ -1,0 +1,21 @@
+import tornado.options
+import tornado.web
+import tornado.ioloop
+import tornado.httpserver
+
+tornado.options.define('port',default=8000,help='runrunrunru',type=int)
+class HelloGetHandler(tornado.web.RequestHandler):
+        def get(self,reversearg):
+                self.write(reversearg[::-1])
+
+class HelloPostHandler(tornado.web.RequestHandler):
+        def post(self):
+                greeting = self.get_argument('greeting','hello')
+                self.write(greeting + ',you can do it !')
+
+if __name__ == '__main__':
+        tornado.options.parse_command_line()
+        app = tornado.web.Application(handlers=[(r"/reverse/(\w+)",HelloGetHandler),(r'/post',HelloPostHandler)])
+        http_server = tornado.httpserver.HTTPServer(app)
+        http_server.listen(tornado.options.options.port)
+        tornado.ioloop.IOLoop.instance().start()
