@@ -1,0 +1,25 @@
+from openstack import connection
+from openstack import
+from time import  
+#auth_url = "http://10.73.196.159:5000/v3"
+#project_name = "demo"
+#username = "demo"
+#password = "eff0c92ada2947e9"
+#user_domain_name': 'default',
+#'project_domain_name': 'default',
+conn = connection.Connection(auth_url="http://10.73.196.159:5000/v3",
+                            project_name="demo",
+                            user_domain_name="default",
+                            project_domain_name="default"
+                            username="demo",
+                            password="eff0c92ada2947e9")
+# for container in conn.object_store.containers():
+   # print(container.name)
+
+#for server in conn.compute.servers(details=False):
+#    print(server)
+for i in conn.compute.servers():
+    print(i.to_dict())
+
+print("*" * 100)
+print conn.compute.get_flavor(1)
