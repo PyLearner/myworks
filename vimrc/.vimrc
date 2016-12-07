@@ -13,7 +13,7 @@ set tabstop=4
 set shiftwidth=4
 set softtabstop=4
 " 不加这个在OS X下面delete键用不了
-set backspace=2
+" set backspace=2
 
 " 开启语法高亮功能
 syntax enable
@@ -72,7 +72,6 @@ Bundle 'tomasr/molokai'
 Bundle "mileszs/ack.vim"
 Bundle 'davidhalter/jedi-vim'
 call vundle#end()
-filetype plugin indent on
 " airline 特殊符号
 let g:airline_powerline_fonts = 1
 let mapleader = ','

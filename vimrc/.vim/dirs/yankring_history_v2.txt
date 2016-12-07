@@ -1,6 +1,0 @@
-,,v
-',v
-from time iport sleep,V
- ,v
-#,v
-    print(i),V
