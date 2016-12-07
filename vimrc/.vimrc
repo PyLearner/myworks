@@ -13,7 +13,7 @@ set tabstop=4
 set shiftwidth=4
 set softtabstop=4
 " 不加这个在OS X下面delete键用不了
-" set backspace=2
+set backspace=2
 
 " 开启语法高亮功能
 syntax enable
